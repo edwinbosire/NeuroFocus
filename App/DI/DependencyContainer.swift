@@ -12,7 +12,7 @@ final class DependencyContainer {
 
     private init() {
         // Default registrations for early migration
-        self.screeningRepository = MockScreeningRepository()
+        self.screeningRepository = ScreeningRepository()
         self.pdfService = PDFRenderer()
     }
 }

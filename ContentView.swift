@@ -868,17 +868,17 @@ struct ShareSheet: UIViewControllerRepresentable {
 	func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
-struct ADHDAssessmentView: View {
-	var body: some View {
-		TabView {
-			AssessmentFlowView()
-				.tabItem { Label("Assess", systemImage: "checklist") }
+	struct ADHDAssessmentView: View {
+		var body: some View {
+			TabView {
+				AssessmentFlowView()
+					.tabItem { Label("Assess", systemImage: "checklist") }
 
-			EducationHubView()
-				.tabItem { Label("Learn", systemImage: "book.fill") }
+				EducationHubView()
+					.tabItem { Label("Learn", systemImage: "book.fill") }
+			}
 		}
 	}
-}
 
 #Preview {
 	ADHDAssessmentView()

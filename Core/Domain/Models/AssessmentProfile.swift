@@ -6,6 +6,7 @@ import SwiftUI
 
 public struct AssessmentProfile: Identifiable {
     public let id = UUID()
+	public let index: Int
     public let title: String
     public let subtitle: String
     public let description: String

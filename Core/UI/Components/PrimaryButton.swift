@@ -5,9 +5,9 @@ import SwiftUI
 
 struct PrimaryButton: View {
     let title: String
-    let action: () -> Void
     var color: Color = .blue
     var icon: String? = nil
+	let action: () -> Void
 
     var body: some View {
         Button(action: action) {

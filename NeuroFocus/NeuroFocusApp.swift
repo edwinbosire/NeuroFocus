@@ -15,3 +15,18 @@ struct NeuroFocusApp: App {
         }
     }
 }
+
+struct ADHDAssessmentView: View {
+	var body: some View {
+		NavigationStack {
+			TabView {
+				ScreenersView()
+					.tabItem { Label("Assessment", systemImage: "checklist") }
+
+				EducationHubView()
+					.tabItem { Label("Learn", systemImage: "book.fill") }
+			}
+			.accentColor(.blue)
+		}
+	}
+}

@@ -2,84 +2,104 @@ import Foundation
 import SwiftUI
 
 @MainActor
-final class AssessmentViewModel: ObservableObject {
-    @Published var currentAssessment: AssessmentProfile? = nil
+final class AssessmentViewModel: ObservableObject, Identifiable {
     @Published var currentStep: Int = 0
-    @Published var scores: [Int] = []
-    @Published var appState: AppState = .selection
+	@Published var scores: [UUID :Int] = [:]
+    @Published var appState: AppState = .assessment
 
     // Sheet State
     @Published var showShareSheet = false
     @Published var reportData: Data? = nil
+    @Published var previousResults: [ScreeningRepository.LoadedResult] = []
 
-    enum AppState {
-        case selection, assessment, analyzing, result
+	enum AppState: String {
+        case assessment, analyzing, result
     }
 
+	let id: UUID
+	private let profile: AssessmentProfile
     private let repo: any ScreeningRepositoryProtocol
     private let pdfService: PDFServiceProtocol
 
-    public init(repo: any ScreeningRepositoryProtocol = DependencyContainer.shared.screeningRepository,
+	public init(assessment: AssessmentProfile, repo: any ScreeningRepositoryProtocol = DependencyContainer.shared.screeningRepository,
                 pdfService: PDFServiceProtocol = DependencyContainer.shared.pdfService) {
+		self.id = assessment.id
+		self.profile = assessment
         self.repo = repo
         self.pdfService = pdfService
     }
 
+
+	// MARK: AssessmentProfile
+	var index: Int {
+		profile.index
+	}
+	var title: String {
+		profile.title
+	}
+	var subtitle: String {
+		profile.subtitle
+	}
+	var description: String {
+		profile.description
+	}
+	var badge: String? {
+		profile.badge
+	}
+	var color: Color {
+		profile.color
+	}
+	var questions: [Question] {
+		profile.questions
+	}
+
+
     var progress: CGFloat {
-        guard let questions = currentAssessment?.questions else { return 0 }
-        return CGFloat(currentStep) / CGFloat(questions.count)
+        CGFloat(currentStep) / CGFloat(questions.count)
     }
 
-    func selectAssessment(_ profile: AssessmentProfile) {
-        self.currentAssessment = profile
-        withAnimation(.spring()) {
-            appState = .assessment
-            currentStep = 0
-            scores = []
-        }
-    }
+	func answerQuestion(value: Int) async {
+		guard currentStep < questions.count - 2 else {
+			await completeAssessment()
+			return
+		}
+		scores[questions[currentStep].id] = value
+		currentStep += 1
+	}
 
-    func answerQuestion(value: Int) {
-        scores.append(value)
+	func completeAssessment() async {
+		appState = .analyzing
+	}
 
-        guard let questions = currentAssessment?.questions else { return }
+	func completeAnalysis() async {
+		self.appState = .result
+		// Persist diagnosis result and transcript to repo (fire-and-forget)
+		Task {
+			do {
+				let result = self.getResult()
+				let transcript: [(index: Int, text: String, answer: String)] = {
+					let answerOptions = ["Never","Rarely","Sometimes","Often","Very Often"]
+					return questions.enumerated().map { (index, question) in
+						let answerIndex = scores[question.id] ?? 0
+						let answer = answerOptions[min(answerIndex, answerOptions.count - 1)]
+						return (index: index + 1, text: question.text, answer: answer)
+					}
+				}()
+				if let repo = self.repo as? ScreeningRepository {
+					try await repo.saveResult(result, transcript: transcript)
+				} else {
+					// fallback for protocol
+					try await self.repo.saveResult(result)
+				}
+			} catch {
+				// ignore for MVP
+			}
+		}
+	}
 
-        if currentStep < questions.count - 1 {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                currentStep += 1
-            }
-        } else {
-            completeAssessment()
-        }
-    }
-
-    func completeAssessment() {
-        withAnimation {
-            appState = .analyzing
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            withAnimation {
-                self.appState = .result
-            }
-            Task {
-                // Persist a simple diagnosis result to repo (fire-and-forget)
-                do {
-                    let result = self.getResult()
-                    try await self.repo.saveResult(result)
-                } catch {
-                    // ignore for MVP
-                }
-            }
-        }
-    }
-
-    func getResult() -> DiagnosisResult {
-        guard let currentAssessment = currentAssessment else {
-            return DiagnosisResult(score: 0, category: "Error", description: "No assessment data", color: .gray, insights: [])
-        }
-
-        let totalScore = scores.reduce(0, +)
-        let maxPossible = currentAssessment.questions.count * 4
+	func getResult() -> DiagnosisResult {
+		let totalScore = Array(scores.values).reduce(0, +)
+        let maxPossible = questions.count * 4
         let percentage = Double(totalScore) / Double(maxPossible)
 
         let categoryInsights = generateDetailedInsights()
@@ -94,14 +114,14 @@ final class AssessmentViewModel: ObservableObject {
     }
 
     private func generateDetailedInsights() -> [CategoryInsight] {
-        guard let questions = currentAssessment?.questions else { return [] }
+		guard questions.count > 0 else { return [] }
+		let questions = questions
         var insights: [CategoryInsight] = []
 
         let presentCategories = Set(questions.map { $0.category })
-
         for category in presentCategories {
             let categoryIndices = questions.indices.filter { questions[$0].category == category }
-            let categoryScores = categoryIndices.map { scores.indices.contains($0) ? scores[$0] : 0 }
+			let categoryScores = categoryIndices.map { scores[questions[$0].id] ?? 0 }
             let total = categoryScores.reduce(0, +)
             let max = categoryIndices.count * 4
             let percentage = Double(total) / Double(max)
@@ -127,11 +147,11 @@ final class AssessmentViewModel: ObservableObject {
 
     func generatePDF() {
         // Build ReportData
-        guard let assessment = currentAssessment else { return }
+		let assessment = profile
 
         var rdQuestions: [ReportQuestion] = []
         for (index, question) in assessment.questions.enumerated() {
-            let answerIndex = scores.indices.contains(index) ? scores[index] : 0
+			let answerIndex = scores[question.id] ?? 0
             let answerOptions = ["Never","Rarely","Sometimes","Often","Very Often"]
             let answer = answerOptions[min(answerIndex, answerOptions.count - 1)]
             rdQuestions.append(ReportQuestion(index: index + 1, text: question.text, answer: answer))
@@ -155,12 +175,51 @@ final class AssessmentViewModel: ObservableObject {
 
     func reset() {
         withAnimation {
-            appState = .selection
+            appState = .assessment
             currentStep = 0
-            scores = []
-            currentAssessment = nil
+			scores = [:]
             reportData = nil
             showShareSheet = false
         }
     }
+
+    func loadPreviousResults() async {
+        guard let repo = self.repo as? ScreeningRepository else { return }
+        do {
+            let results = try await repo.loadResultsWithTranscripts()
+            Task {@MainActor in
+                self.previousResults = results
+            }
+        } catch {
+            // ignore for MVP
+        }
+    }
 }
+
+// MARK: - DATA
+
+// 1. The Detailed Assessment (Original)
+let detailedQuestions: [Question] = [
+	Question(text: "When you have a task that requires a lot of thought, how often do you avoid or delay getting started?", category: .executiveFunction),
+	Question(text: "How often do you have trouble keeping your attention on repetitive work?", category: .executiveFunction),
+	Question(text: "How often do you have difficulty getting things in order when you have to do a task that requires organization?", category: .organization),
+	Question(text: "How often do you have trouble wrapping up the final details of a project, once the challenging parts have been done?", category: .organization),
+	Question(text: "How often do you have problems remembering appointments or obligations?", category: .workingMemory),
+	Question(text: "Do you often find yourself entering a room and forgetting why you went there?", category: .workingMemory),
+	Question(text: "How often do you fidget or squirm with your hands or feet when you have to sit down for a long time?", category: .impulsivity),
+	Question(text: "How often do you feel overly active and compelled to do things, like you were driven by a motor?", category: .impulsivity),
+	Question(text: "How often do you feel easily frustrated by small annoyances?", category: .emotionalRegulation),
+	Question(text: "Do you experience rapid shifts in mood that seem out of proportion to events?", category: .emotionalRegulation)
+]
+
+// 2. The NHS / ASRS v1.1 Part A Screener
+let nhsScreenerQuestions: [Question] = [
+	Question(text: "How often do you have trouble wrapping up the final details of a project, once the challenging parts have been done?", category: .generalAttention),
+	Question(text: "How often do you have difficulty getting things in order when you have to do a task that requires organization?", category: .organization),
+	Question(text: "How often do you have problems remembering appointments or obligations?", category: .workingMemory),
+	Question(text: "When you have a task that requires a lot of thought, how often do you avoid or delay getting started?", category: .executiveFunction),
+	Question(text: "How often do you fidget or squirm with your hands or feet when you have to sit down for a long time?", category: .hyperactivity),
+	Question(text: "How often do you feel overly active and compelled to do things, like you were driven by a motor?", category: .hyperactivity)
+]
+
+

@@ -3,26 +3,36 @@ import SwiftUI
 /// OptionButton migrated from ContentView.swift
 struct OptionButton: View {
     let title: String
-    let isSelected: Bool
+	let tint: Color
     let action: () -> Void
+	@State private var isSelected: Bool
 
-    var body: some View {
-        Button(action: action) {
-            HStack {
-                Text(title)
-                    .font(.body)
-                    .fontWeight(.medium)
-                    .foregroundColor(Color.primary)
-                Spacer()
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill").foregroundColor(.blue)
-                } else {
-                    Image(systemName: "circle").foregroundColor(.gray.opacity(0.5))
-                }
-            }
+	init(title: String, isSelected: Bool = false, tint: Color, action: @escaping () -> Void) {
+		self.title = title
+		self.isSelected = isSelected
+		self.tint = tint
+		self.action = action
+	}
+
+	var body: some View {
+		Button(action: {
+			isSelected.toggle()
+			action()
+		}) {
+			HStack {
+				Text(title)
+					.font(.body)
+					.fontWeight(.medium)
+					.foregroundColor(Color.primary)
+					.frame(maxWidth: .infinity, alignment: .leading)
+
+				Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+					.foregroundColor(isSelected ? tint : .gray.opacity(0.5))
+					.contentTransition(.symbolEffect(.replace))
+			}
             .padding()
-            .background(Color(UIColor.secondarySystemBackground))
-            .cornerRadius(12)
+			.frame(maxHeight: .infinity)
+//            .background(Color(UIColor.secondarySystemBackground))
         }
     }
 }

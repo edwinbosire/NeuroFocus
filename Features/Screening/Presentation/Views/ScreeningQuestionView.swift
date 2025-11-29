@@ -1,60 +1,145 @@
 import SwiftUI
 
 struct ScreeningQuestionView: View {
-    @ObservedObject var viewModel: AssessmentViewModel
+	@ObservedObject var viewModel: AssessmentViewModel
 
-    let answerOptions = ["Never","Rarely","Sometimes","Often","Very Often"]
+	@State private var currentQuestion: UUID?
 
-    var body: some View {
-        VStack {
-            HStack {
-                Button(action: { viewModel.reset() }) {
-                    Image(systemName: "xmark").foregroundColor(.primary).padding(10).background(Circle().fill(Color(UIColor.secondarySystemBackground)))
-                }
-                Spacer()
+	// Stops user interaction if selection is in progress, avoids double selection
+	@State private var selectionInProgress: Bool = false
+	var body: some View {
+		VStack {
+			ProgressBar(value: viewModel.progress, color: viewModel.color)
+			.padding()
 
-                if let questions = viewModel.currentAssessment?.questions {
-                    Text("\(viewModel.currentStep + 1)/\(questions.count)")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(.secondary)
-                        .padding(8)
-                        .background(Capsule().fill(Color(UIColor.secondarySystemBackground)))
-                }
-            }
-            .padding()
+				TabView(selection: $currentQuestion) {
+					ForEach(viewModel.questions)  { question in
+						QuestionView(question: question, tint: assessmentTheme) { selectedAnser in
+							Task {
+								await viewModel.answerQuestion(value: selectedAnser)
+							}
+						}
+						.tag(question.id)
+						.gesture(DragGesture())
+					}
+				}
+				.tabViewStyle(.page(indexDisplayMode: .never))
+				.animation(.easeInOut, value: currentQuestion)
+				.disabled(selectionInProgress)
 
-            ProgressBar(value: viewModel.progress, color: viewModel.currentAssessment?.color ?? .blue)
-                .frame(height: 6)
-                .padding(.horizontal)
+		}
+		.background(Color(UIColor.systemBackground))
+		.onChange(of: viewModel.currentStep) { oldValue, newValue in
+			if viewModel.currentStep < viewModel.questions.count - 1 {
+				Task {
+					selectionInProgress = true
+					try? await Task.sleep(nanoseconds: 500_000_000)
+					currentQuestion = viewModel.questions[viewModel.currentStep].id
+					selectionInProgress = false
+				}
+			}
+		}
+		.navigationBarTitleDisplayMode(.inline)
+		.navigationBarBackButtonHidden(true)
+		.toolbar {
+			HeaderControlsToolbar(viewModel: viewModel)
+		}
+	}
 
-            if let question = viewModel.currentAssessment?.questions[viewModel.currentStep] {
-                VStack(alignment: .leading, spacing: 24) {
-                    Spacer()
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(question.category.rawValue)
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .foregroundColor(viewModel.currentAssessment?.color ?? .blue)
-                            .textCase(.uppercase)
+	var assessmentTheme: Color {
+		viewModel.color
+	}
+}
 
-                        Text(question.text)
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+private struct HeaderControlsToolbar: ToolbarContent {
+	@Environment(\.dismiss) var dismiss
+	@ObservedObject var viewModel: AssessmentViewModel
+	var body: some ToolbarContent {
 
-                    VStack(spacing: 12) {
-                        ForEach(0..<answerOptions.count, id: \.self) { index in
-                            OptionButton(title: answerOptions[index], isSelected: false) {
-                                viewModel.answerQuestion(value: index)
-                            }
-                        }
-                    }
-                    Spacer()
-                }
-                .padding(24)
-            }
-        }
-    }
+		ToolbarItem(placement: .topBarLeading) {
+			Button {
+				dismiss()
+				viewModel.reset()
+			} label: {
+				Image(systemName: "xmark")
+					.font(.headline)
+					.padding(8)
+					.background(Color(UIColor.systemGray6), in: Circle())
+			}
+		}
+
+		ToolbarItem(placement: .principal) {
+			Text(viewModel.title)
+				.font(.headline)
+				.frame(maxWidth: .infinity, alignment: .leading)
+		}
+
+		ToolbarItem(placement: .topBarTrailing) {
+			Text("\(viewModel.currentStep + 1)/\(viewModel.questions.count)")
+				.font(.caption)
+				.fontWeight(.bold)
+				.foregroundColor(.secondary)
+				.padding(8)
+				.background(Color(UIColor.secondarySystemBackground), in: Capsule())
+		}
+	}
+}
+
+struct QuestionView: View {
+	let question: Question
+	let tint: Color
+	let didSelectAnswer: (Int) -> Void
+
+	var body: some View {
+		VStack(alignment: .leading, spacing: 24) {
+			Spacer()
+			VStack(alignment: .leading, spacing: 8) {
+				Text(question.category.rawValue)
+					.font(.caption)
+					.fontWeight(.bold)
+					.foregroundColor(tint)
+					.textCase(.uppercase)
+					.padding(.vertical, 4)
+					.padding(.horizontal, 8)
+					.background(categoryColor, in: Capsule())
+
+				Text(question.text)
+					.font(.title)
+			}
+			.padding()
+			Spacer()
+			VStack(spacing: 8) {
+				Text("Choose One Answer")
+					.font(.footnote)
+					.foregroundStyle(.secondary)
+					.frame(maxWidth: .infinity, alignment: .leading)
+					.padding(.leading, 8)
+					.padding(.vertical, 4.0)
+				List {
+					ForEach(0..<question.answerOptions.count, id: \.self) { index in
+						OptionButton(title: question.answerOptions[index], tint: tint) {
+							Task {
+								didSelectAnswer(index)
+							}
+						}
+						.id(question.id)
+						.listRowInsets(.init())
+						.listRowBackground(Color(UIColor.tertiarySystemGroupedBackground))
+					}
+				}
+				.listStyle(.plain)
+				.frame(maxHeight: CGFloat(question.answerOptions.count) * 44.0 - (CGFloat(question.answerOptions.count)) * 2)
+			}
+		}
+	}
+
+	var categoryColor: Color {
+		tint.opacity(0.1)
+	}
+}
+#Preview {
+	@Previewable @State var viewModel = AssessmentViewModel(assessment: availableAssessments[0])
+	NavigationStack {
+		ScreeningQuestionView(viewModel: viewModel)
+	}
 }

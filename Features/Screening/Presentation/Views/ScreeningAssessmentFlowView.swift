@@ -1,47 +1,46 @@
 import SwiftUI
 
-struct ScreeningAssessmentFlowView: View {
-    @StateObject private var viewModel = AssessmentViewModel()
+struct AssessmentLandingPage: View {
+	@ObservedObject var viewModel: AssessmentViewModel
+	var animation: Namespace.ID
 
-    var body: some View {
-        ZStack {
-            Color(UIColor.systemBackground).edgesIgnoringSafeArea(.all)
+	var body: some View {
+		switch viewModel.appState {
+			case .assessment:
+				ScreeningQuestionView(viewModel: viewModel)
+					.transition(.move(edge: .bottom).combined(with: .opacity))
+			case .analyzing:
+				ScreeningAnalyzingView(viewModel: viewModel)
+					.transition(.opacity.combined(with: .scale))
+			case .result:
+				ScreeningResultView(viewModel: viewModel)
+					.transition(.opacity.combined(with: .scale))
+		}
+	}
+}
 
-            switch viewModel.appState {
-            case .selection:
-                // For now render a simple list using original availableAssessments from ContentView.swift
-                VStack(alignment: .leading, spacing: 24) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Assessments").font(.largeTitle).fontWeight(.bold)
-                        Text("Choose a screening tool to begin.").font(.body).foregroundColor(.secondary)
-                    }
-                    .padding(.top, 20)
+struct AssessmentFlowProgressView: View {
+	var body: some View {
+		ZStack {
+			Color.gray.opacity(0.15).edgesIgnoringSafeArea(.all)
+			ProgressView {
+				Text("Loading assessment...")
+					.font(.headline)
+			}
+		}
+	}
+}
 
-                    // Fallback: use in-process availableAssessments var from global scope in ContentView.swift
-                    if let mirror = Mirror(reflecting: availableAssessments).children.first {
-                        // not used; keep placeholder until screener loader is implemented
-                    }
+struct QuestionViewContainerView: View {
+	var body: some View {
+		Text("Hello, world!")
+	}
+}
 
-                    ForEach(availableAssessments) { profile in
-                        AssessmentCard(profile: profile) {
-                            viewModel.selectAssessment(profile)
-                        }
-                    }
-
-                    Spacer()
-                }
-                .padding()
-
-            case .assessment:
-                ScreeningQuestionView(viewModel: viewModel)
-
-            case .analyzing:
-                ScreeningAnalyzingView()
-
-            case .result:
-                ScreeningResultView(viewModel: viewModel)
-            }
-        }
-        .animation(.default, value: viewModel.appState)
-    }
+#Preview {
+	@Previewable @State var viewModel = AssessmentViewModel(assessment: availableAssessments[0])
+	@Previewable @Namespace var animation
+	NavigationStack {
+		AssessmentLandingPage(viewModel: viewModel, animation: animation)
+	}
 }

@@ -30,6 +30,21 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		64A210922ED224A40064EF87 /* App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = App;
+			sourceTree = "<group>";
+		};
+		64A210AE2ED224A40064EF87 /* Core */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Core;
+			sourceTree = "<group>";
+		};
+		64A210BD2ED224A40064EF87 /* Features */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Features;
+			sourceTree = "<group>";
+		};
 		64B0EF482ECFEBCC00B21595 /* NeuroFocus */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = NeuroFocus;
@@ -75,6 +90,9 @@
 		64B0EF3D2ECFEBCC00B21595 = {
 			isa = PBXGroup;
 			children = (
+				64A210922ED224A40064EF87 /* App */,
+				64A210AE2ED224A40064EF87 /* Core */,
+				64A210BD2ED224A40064EF87 /* Features */,
 				64B0EF482ECFEBCC00B21595 /* NeuroFocus */,
 				64B0EF572ECFEBCE00B21595 /* NeuroFocusTests */,
 				64B0EF612ECFEBCE00B21595 /* NeuroFocusUITests */,
@@ -108,6 +126,9 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
+				64A210922ED224A40064EF87 /* App */,
+				64A210AE2ED224A40064EF87 /* Core */,
+				64A210BD2ED224A40064EF87 /* Features */,
 				64B0EF482ECFEBCC00B21595 /* NeuroFocus */,
 			);
 			name = NeuroFocus;
