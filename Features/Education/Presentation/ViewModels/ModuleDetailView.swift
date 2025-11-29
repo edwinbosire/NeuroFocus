@@ -14,7 +14,7 @@ struct ModuleDetailView: View {
 	var body: some View {
 		ScrollView {
 			VStack(alignment: .leading, spacing: 1) {
-				HStack {
+				VStack {
 					Circle()
 						.fill(module.color.opacity(0.15))
 						.frame(width: 60, height: 60)
@@ -28,31 +28,39 @@ struct ModuleDetailView: View {
 						Text(module.title)
 							.font(.title2)
 							.fontWeight(.bold)
-							.frame(maxWidth: .infinity, alignment: .leading)
+							.frame(maxWidth: .infinity, alignment: .center)
 						if let tag = module.tag {
 							Text(tag.uppercased())
 								.font(.caption)
 								.fontWeight(.bold)
 								.foregroundColor(.secondary)
+								.frame(maxWidth: .infinity, alignment: .center)
 						}
 					}
 				}
 				.padding()
-				.background {
-					module.color.opacity(0.2)
-						.ignoresSafeArea(.container, edges: .top)
-				}
-				Divider()
+				.ignoresSafeArea(.container, edges: .top)
+
 				Text(formattedContent)
 					.font(.body)
 					.lineSpacing(6)
 					.padding(.bottom, 40)
-					.padding()
+					.padding(.top, 30)
+					.padding(.horizontal, 20)
+					.background {
+						UnevenRoundedRectangle(cornerRadii: .init(topLeading: 20, topTrailing: 20))
+							.fill(Color(UIColor.systemBackground))
+					}
+
 			}
+			.navigationTitle(module.title)
+			.ignoresSafeArea(.all)
+			.background(module.color.opacity(0.2))
 			.navigationTransition(.zoom(sourceID: module.id, in: animation))
-			.toolbar(.hidden, for: .tabBar)
 		}
+		.toolbar(.hidden, for: .tabBar)
 		.navigationBarTitleDisplayMode(.inline)
+		.background(module.color.opacity(0.15))
 	}
 
 	var formattedContent: AttributedString {
@@ -82,7 +90,7 @@ struct ModuleDetailView: View {
   > **Tip:** Be honest about your *"worst days."* High-functioning adults often downplay their struggles because they have developed coping mechanisms that hide the struggle.
   """,
 		color: .blue,
-		tag: nil
+		tag: "Recommended"
 	)
 
 	NavigationStack {
